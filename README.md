@@ -1,0 +1,1 @@
+The Tetim_Processing project aims to collect speech data from the Sakha language radio station, Tetim. It operates at a frequency of 107.1 MHz in its broadcast area of Yakutsk. The channel is also available for online broadcasting [here](http://icecast-saha.cdnvideo.ru/saha).
