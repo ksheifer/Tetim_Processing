@@ -1,0 +1,45 @@
+import torch
+import time
+from pyannote.audio.pipelines import SpeakerDiarization
+from pyannote.core import Annotation
+
+# Путь к аудио
+audio_file = '/Users/karinasheifer/Documents/Languages/Turkic/NorthSiberian/YKT/sakha_radio/radio_20241021_190434.wav'
+
+# Проверяем, доступен ли GPU
+device = torch.device("mps" if torch.backends.mps.is_available() else "cpu")
+print(f"Используется устройство: {device}")
+
+# Загрузка модели
+pipeline = SpeakerDiarization.from_pretrained("pyannote/speaker-diarization")
+
+# Перевод модели на GPU
+pipeline.to(device)
+
+# Начало измерения времени
+start_time = time.time()
+
+# Принт начала диаризации
+print("Начало диаризации...")
+
+# Диаризация
+try:
+    diarization = pipeline(audio_file)
+
+    # Печать типа и содержимого результат
+    print(f"Тип результата: {type(diarization)}")
+    print(f"Содержимое результата: {diarization}")
+
+    # Проверка, является ли diarization объектом типа Annotation
+    if isinstance(diarization, Annotation):
+        # Вывод времени обработки
+        print(f"Время обработки этапа: {time.time() - start_time} секунд")
+
+        # Сохранение результата в RTTM
+        diarization.write_rttm('/path/to/output_rttm.rttm')
+        print("Диаризация завершена. Результат сохранён в 'output_rttm.rttm'.")
+    else:
+        print("Ошибка: Результат диаризации не является объектом типа Annotation.")
+
+except Exception as e:
+    print(f"Ошибка при диаризации: {e}")
