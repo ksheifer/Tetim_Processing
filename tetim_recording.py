@@ -1,21 +1,13 @@
 import os
 import time
 import subprocess
-import logging
 from tenacity import retry, stop_after_attempt, wait_fixed
-
-# Set up logging
-logging.basicConfig(
-    filename=os.path.expanduser("~/Documents/Languages/Turkic/NorthSiberian/YKT/radio/recording_errors.log"),
-    level=logging.ERROR,  # Log only errors
-    format='%(asctime)s - %(levelname)s - %(message)s'
-)
 
 # Set the stream URL
 STREAM_URL = "http://icecast-saha.cdnvideo.ru/saha"
 
 # Set the directory where you want to save the recordings
-OUTPUT_DIR = os.path.expanduser("~/Documents/Languages/Turkic/NorthSiberian/YKT/radio")
+OUTPUT_DIR = os.path.expanduser("~/Documents/Languages/Turkic/NorthSiberian/YKT/sakha_radio")
 
 # Recording duration (in HH:MM:SS format)
 RECORDING_DURATION = "01:00:00"
@@ -49,6 +41,4 @@ while True:
     try:
         record_stream()
     except subprocess.CalledProcessError as e:
-        error_message = f"Error while recording: {e}"
-        print(error_message)  # Print to console
-        logging.error(error_message)  # Log the error
+        print(f"Error while recording: {e}")  # Print to console
