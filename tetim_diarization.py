@@ -7,10 +7,13 @@ import os
 import sys
 import argparse
 
-def diarize_and_segment(audio_file):
+def diarize_and_segment(audio_file, min_segment_length=3000, min_pause_duration=2000):
     """
     Perform speaker diarization on the provided audio file and split it into segments.
     """
+    # Начинаем замер времени выполнения
+    total_start_time = time.time()
+
     # Check if GPU is available
     device = torch.device("mps" if torch.backends.mps.is_available() else "cpu")
     print(f"Using device: {device}")
@@ -19,7 +22,6 @@ def diarize_and_segment(audio_file):
     pipeline = SpeakerDiarization.from_pretrained("pyannote/speaker-diarization")
     pipeline.to(device)
 
-    # Start measuring time
     print("Starting diarization...")
     start_time = time.time()
 
@@ -59,6 +61,22 @@ def diarize_and_segment(audio_file):
                 speaker = speaker.strip()
                 segments.append((start_time, end_time, speaker))
 
+    # Merge segments based on min_pause_duration
+    merged_segments = []
+    for i, (start_time, end_time, speaker) in enumerate(segments):
+        start_ms = parse_time_to_ms(start_time)
+        end_ms = parse_time_to_ms(end_time)
+
+        if i == 0:
+            merged_segments.append((start_ms, end_ms, speaker))
+            continue
+
+        prev_start, prev_end, prev_speaker = merged_segments[-1]
+        if start_ms - prev_end < min_pause_duration:
+            merged_segments[-1] = (prev_start, end_ms, prev_speaker)
+        else:
+            merged_segments.append((start_ms, end_ms, speaker))
+
     # Create directory to save the segments
     output_dir = os.path.join(os.path.dirname(audio_file), filename)
     os.makedirs(output_dir, exist_ok=True)
@@ -67,22 +85,20 @@ def diarize_and_segment(audio_file):
     audio = AudioSegment.from_wav(audio_file)
 
     # Split the audio into segments based on timecodes
-    for start_time, end_time, speaker in segments:
-        start_ms = parse_time_to_ms(start_time)
-        end_ms = parse_time_to_ms(end_time)
+    for start_ms, end_ms, speaker in merged_segments:
         segment_duration = end_ms - start_ms
 
-        # Skip segments shorter than 2 seconds
-        if segment_duration < 2000:
-            print(f"Segment {speaker} {start_time} --> {end_time} skipped (too short).")
+        # Skip segments shorter than min_segment_length
+        if segment_duration < min_segment_length:
+            print(f"Segment {speaker} {start_ms} --> {end_ms} skipped (too short).")
             continue
 
         segment = audio[start_ms:end_ms]
         speaker_number = speaker.split()[-1]
 
         # Format time for the filename
-        start_time_formatted = start_time.replace(':', '').replace('.', '_')
-        end_time_formatted = end_time.replace(':', '').replace('.', '_')
+        start_time_formatted = f"{start_ms // 3600000:02}:{(start_ms // 60000) % 60:02}:{(start_ms // 1000) % 60:02}_{start_ms % 1000:03}"
+        end_time_formatted = f"{end_ms // 3600000:02}:{(end_ms // 60000) % 60:02}:{(end_ms // 1000) % 60:02}_{end_ms % 1000:03}"
 
         # Create the output filename
         output_filename = f"{speaker_number}_{start_time_formatted}_{end_time_formatted}.wav".replace(" ", "")
@@ -93,13 +109,21 @@ def diarize_and_segment(audio_file):
 
     print("Audio segmentation completed.")
 
+    # Завершаем замер времени выполнения и выводим результат
+    total_end_time = time.time()
+    elapsed_time = total_end_time - total_start_time
+    minutes, seconds = divmod(int(elapsed_time), 60)
+    print(f"Total processing time: {minutes} minutes {seconds} seconds")
+
 
 if __name__ == "__main__":
     # Set up argument parsing
     parser = argparse.ArgumentParser(description="Diarize and segment an audio file.")
     parser.add_argument("audio_path", type=str, help="Path to the audio file for processing")
+    parser.add_argument("--min_segment_length", type=int, default=3000, help="Minimum segment length in milliseconds")
+    parser.add_argument("--min_pause_duration", type=int, default=100, help="Minimum pause duration in milliseconds")
 
     args = parser.parse_args()
 
     # Run the diarization and segmentation function with the provided audio file
-    diarize_and_segment(args.audio_path)
+    diarize_and_segment(args.audio_path, args.min_segment_length, args.min_pause_duration)
