@@ -7,11 +7,11 @@ import os
 import sys
 import argparse
 
-def diarize_and_segment(audio_file, min_segment_length=3000, min_pause_duration=2000):
+def diarize_and_segment(audio_file, min_segment_length=3000, min_pause_duration=100):
     """
     Perform speaker diarization on the provided audio file and split it into segments.
     """
-    # Начинаем замер времени выполнения
+    # Start measuring the total execution time
     total_start_time = time.time()
 
     # Check if GPU is available
@@ -72,23 +72,24 @@ def diarize_and_segment(audio_file, min_segment_length=3000, min_pause_duration=
             continue
 
         prev_start, prev_end, prev_speaker = merged_segments[-1]
+        # Merge segments if the pause between them is shorter than the specified minimum pause duration
         if start_ms - prev_end < min_pause_duration:
             merged_segments[-1] = (prev_start, end_ms, prev_speaker)
         else:
             merged_segments.append((start_ms, end_ms, speaker))
 
-    # Create directory to save the segments
+    # Create a directory to save the segments
     output_dir = os.path.join(os.path.dirname(audio_file), filename)
     os.makedirs(output_dir, exist_ok=True)
 
     # Load the original audio
     audio = AudioSegment.from_wav(audio_file)
 
-    # Split the audio into segments based on timecodes
+    # Split the audio into segments based on the timecodes
     for start_ms, end_ms, speaker in merged_segments:
         segment_duration = end_ms - start_ms
 
-        # Skip segments shorter than min_segment_length
+        # Skip segments shorter than the specified minimum segment length
         if segment_duration < min_segment_length:
             print(f"Segment {speaker} {start_ms} --> {end_ms} skipped (too short).")
             continue
@@ -104,12 +105,13 @@ def diarize_and_segment(audio_file, min_segment_length=3000, min_pause_duration=
         output_filename = f"{speaker_number}_{start_time_formatted}_{end_time_formatted}.wav".replace(" ", "")
         output_file = os.path.join(output_dir, output_filename)
 
+        # Save the segmented audio to a file
         segment.export(output_file, format="wav")
         print(f"Segment saved: {output_file}")
 
     print("Audio segmentation completed.")
 
-    # Завершаем замер времени выполнения и выводим результат
+    # End measuring the total execution time and print the result
     total_end_time = time.time()
     elapsed_time = total_end_time - total_start_time
     minutes, seconds = divmod(int(elapsed_time), 60)
